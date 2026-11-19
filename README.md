@@ -13,6 +13,7 @@ Bitcap runs on **Cloudflare Workers** first, but crypto and routing live in `src
 - Per-host config: **`probe`** or **`allowlist`** mode
 - KV **Block #N** counter
 - Cookie name: `bitcap`
+- Challenge scripts at `/.bitcap/bitcap_wor.js` and `bitcap_min.js` (neutral names to reduce adblock false positives)
 
 ## Quick start (bitcoinpunchup.com)
 

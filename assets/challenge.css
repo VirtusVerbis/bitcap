@@ -1,4 +1,4 @@
-/* Derived from PoWned (GPL-2.0-or-later). --pw-brand is set from settings by miner.js. */
+/* Derived from PoWned (GPL-2.0-or-later). --pw-brand is set from settings by bitcap_min.js. */
 :root { --pw-brand: #f7931a; --pw-bg: #111315; --pw-text: #eceef0; --pw-muted: #8b9299; --pw-tile: #22262a; --pw-ok: #3ccf7e; --pw-brand-text: var(--pw-brand); }
 @media (prefers-color-scheme: light) {
   :root { --pw-bg: #f5f5f3; --pw-text: #1a1c1e; --pw-muted: #6a7178; --pw-tile: #e3e5e7; --pw-ok: #16884a; --pw-brand-text: color-mix(in srgb, var(--pw-brand) 55%, #000); }

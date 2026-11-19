@@ -39,7 +39,7 @@ export function renderChallengeHtml(p: ChallengePageParams): string {
     `data-cookie="bitcap"`,
     `data-ttl="${p.pow.ttlHours * 3600}"`,
     `data-secure="${p.secure ? "1" : "0"}"`,
-    `data-worker="/.bitcap/worker.js?ver=${VERSION}"`,
+    `data-worker="/.bitcap/bitcap_wor.js?ver=${VERSION}"`,
     `data-brand="${esc(brand)}"`,
     `data-found="${esc(t.found)}"`,
     `data-nocookie="${esc(t.nocook)}"`,
@@ -76,8 +76,8 @@ export function renderChallengeHtml(p: ChallengePageParams): string {
     <p class="pw-foot-back"><a href="${esc(p.backUrl)}">${esc(t.back)}</a></p>
   </footer>
 </main>
-<script src="/.bitcap/worker.js?ver=${VERSION}"></script>
-<script src="/.bitcap/miner.js?ver=${VERSION}"></script>
+<script src="/.bitcap/bitcap_wor.js?ver=${VERSION}"></script>
+<script src="/.bitcap/bitcap_min.js?ver=${VERSION}"></script>
 </body>
 </html>`;
 }

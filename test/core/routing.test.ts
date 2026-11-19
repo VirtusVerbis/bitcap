@@ -39,7 +39,7 @@ describe("classifyPath probe mode", () => {
   });
 
   it("passes bitcap assets", () => {
-    expect(classifyPath(probeHost, "/.bitcap/worker.js")).toBe("pass");
+    expect(classifyPath(probeHost, "/.bitcap/bitcap_wor.js")).toBe("pass");
   });
 });
 
