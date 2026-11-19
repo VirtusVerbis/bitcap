@@ -1,0 +1,41 @@
+# Copy to hosts.yaml (or add hosts) and run: npm run sync-config
+#
+# mode: probe   — challenge only when probePatterns match
+# mode: allowlist — challenge when path is NOT in allow (+ optional allowExtensions)
+
+example.com:
+  enabled: true
+  mode: probe
+
+  neverChallenge:
+    exact:
+      - /robots.txt
+    prefixes: []
+
+  probePatterns:
+    - /wp-admin*
+    - /wp-*
+    - /*.php
+    - /.env
+
+  allow:
+    exact:
+      - /
+      - /favicon.ico
+    prefixes:
+      - /assets/
+      - /static/
+
+  allowExtensions: []
+
+  pow:
+    baseBits: 18
+    ttlHours: 24
+    binding: network
+    httpStatus: 403
+
+  branding:
+    brandColor: "#f7931a"
+    logoUrl: ""
+    title: ""
+    text: ""

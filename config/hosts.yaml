@@ -1,0 +1,43 @@
+bitcoinpunchup.com:
+  enabled: true
+  mode: allowlist
+
+  neverChallenge:
+    exact:
+      - /robots.txt
+    prefixes: []
+
+  probePatterns:
+    - /wp-admin*
+    - /wp-login.php
+    - /wp-*
+    - /xmlrpc.php
+    - /*.php
+    - /.env
+    - /.git/*
+
+  allow:
+    exact:
+      - /
+      - /favicon.ico
+      - /favicon-48.png
+      - /favicon-192.png
+      - /site.webmanifest
+      - /zapstore_badge.png
+    prefixes:
+      - /assets/
+      - /mobile/
+
+  allowExtensions: []
+
+  pow:
+    baseBits: 18
+    ttlHours: 0.25
+    binding: network
+    httpStatus: 403
+
+  branding:
+    brandColor: "#f7931a"
+    logoUrl: /mobile/app_icon.png
+    title: ""
+    text: ""

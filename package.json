@@ -1,0 +1,22 @@
+{
+  "name": "bitcap",
+  "version": "0.1.0",
+  "description": "Edge proof-of-work gate (PoWned-derived UI, GPL-2.0+)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "sync-config": "node scripts/sync-config.mjs",
+    "predeploy": "npm run sync-config",
+    "test": "vitest run",
+    "dev": "wrangler dev",
+    "deploy": "npm run predeploy && wrangler deploy"
+  },
+  "license": "GPL-2.0-or-later",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250214.0",
+    "js-yaml": "^4.1.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5",
+    "wrangler": "^4.14.0"
+  }
+}
