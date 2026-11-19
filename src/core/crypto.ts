@@ -1,8 +1,12 @@
 import type { BindingMode, PowConfig, ValidBlock } from "./types.ts";
 import { COOKIE_NAME } from "./types.ts";
 
-const COOKIE_RE =
-  /^1\.(\d{10})\.([0-9a-f]{12})\.(\d{1,2})\.([0-9a-f]{12})\.(\d{1,12})\.([0-9a-f]{16})$/;
+export const CLIENT_KEY_HEX = 16;
+export const CHALLENGE_MAC_HEX = 32;
+
+const COOKIE_RE = new RegExp(
+  `^1\\.(\\d{10})\\.([0-9a-f]{${CLIENT_KEY_HEX}})\\.(\\d{1,3})\\.([0-9a-f]{12})\\.(\\d{1,12})\\.([0-9a-f]{${CHALLENGE_MAC_HEX}})$`,
+);
 
 export function zeroBits(data: Uint8Array): number {
   let bits = 0;
@@ -33,6 +37,15 @@ export async function hash256String(text: string): Promise<Uint8Array> {
 
 function hexEncode(bytes: Uint8Array): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) {
+    out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return out === 0;
 }
 
 async function hmacSha256Hex(
@@ -97,6 +110,12 @@ function expandIpv6(ip: string): Uint8Array | null {
   return out;
 }
 
+export function isBindableIp(ip: string | null | undefined, binding: BindingMode): boolean {
+  if (binding === "none") return true;
+  if (!ip || !ip.trim()) return false;
+  return parseIpBytes(ip.trim()) !== null;
+}
+
 export async function clientKey(
   secret: string,
   binding: BindingMode,
@@ -108,7 +127,7 @@ export async function clientKey(
   } else {
     const bin = parseIpBytes(ip.trim());
     if (!bin) {
-      net = "any";
+      net = "__invalid_ip__";
     } else if (binding === "ip") {
       net = hexEncode(bin);
     } else {
@@ -116,14 +135,14 @@ export async function clientKey(
       net = hexEncode(slice);
     }
   }
-  return hmacSha256Hex(secret, `client|${binding}|${net}`, 12);
+  return hmacSha256Hex(secret, `client|${binding}|${net}`, CLIENT_KEY_HEX);
 }
 
 export async function macChallenge(
   secret: string,
   challenge: string,
 ): Promise<string> {
-  return hmacSha256Hex(secret, `challenge|${challenge}`, 16);
+  return hmacSha256Hex(secret, `challenge|${challenge}`, CHALLENGE_MAC_HEX);
 }
 
 export interface NewChallenge {
@@ -161,23 +180,27 @@ export async function validCookie(
   const nonce = m[5];
   const mac = m[6];
 
+  if (!isBindableIp(clientIp, pow.binding)) {
+    return null;
+  }
+
   const now = Math.floor(Date.now() / 1000);
   if (
     expiry < now ||
     expiry > now + pow.ttlHours * 3600 + 600 ||
-    bits < pow.baseBits
+    bits !== pow.baseBits
   ) {
     return null;
   }
 
   const expectedClient = await clientKey(secret, pow.binding, clientIp);
-  if (client !== expectedClient) {
+  if (!timingSafeEqualHex(client, expectedClient)) {
     return null;
   }
 
   const challenge = `1.${expiry}.${client}.${bits}.${salt}.`;
   const expectedMac = await macChallenge(secret, challenge);
-  if (mac !== expectedMac) {
+  if (!timingSafeEqualHex(mac, expectedMac)) {
     return null;
   }
 

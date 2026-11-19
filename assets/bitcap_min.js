@@ -1,6 +1,6 @@
 /*
  * Bitcap challenge page (derived from PoWned): start one miner per CPU core (at most 4), fill the block as mining
- * progresses, store the solved block in a cookie and reload the requested page.
+ * progresses, POST the solved block to /.bitcap/verify for HttpOnly cookies, then reload the requested page.
  */
 (function () {
 	'use strict';
@@ -25,22 +25,42 @@
 		tiles.forEach(function (t) { t.classList.remove('next'); });
 		if (lit < tiles.length) tiles[order[lit]].classList.add('next');
 	}
-	function mark(h) {
+	function showHash(h) {
+		var node = $('pw-hash');
+		if (!node) return;
+		node.textContent = '';
 		var z = h.match(/^0*/)[0].length;
-		return '<b>' + h.slice(0, z) + '</b>' + h.slice(z);
+		if (z > 0) {
+			var bold = document.createElement('b');
+			bold.textContent = h.slice(0, z);
+			node.appendChild(bold);
+			node.appendChild(document.createTextNode(h.slice(z)));
+		} else {
+			node.textContent = h;
+		}
 	}
 	function total() { return counts.reduce(function (a, b) { return a + b; }, 0); }
 	function progress(nonce) {
 		var n = total(), secs = (Date.now() - started) / 1000;
 		$('pw-nonce').textContent = nonce.toLocaleString();
 		if (secs > 0.05) $('pw-rate').textContent = Math.round(n / secs / 1000).toLocaleString() + ' kH/s';
-		if (best) $('pw-hash').innerHTML = mark(best);
+		if (best) showHash(best);
 		/* Expected share of the work done; mining is random, so this is an estimate. */
 		fill(Math.min(0.95, 1 - Math.exp(-n / expected)));
 	}
 	function fail(msg) {
 		var s = $('pw-status');
 		s.textContent = msg; s.className = 'pw-status err';
+	}
+	function afterVerify() {
+		var tries = 1;
+		try {
+      var prev = JSON.parse(sessionStorage.getItem('bitcap_reloads') || '{}');
+      if (prev.t && Date.now() - prev.t < 30000) tries = (prev.n || 0) + 1;
+      sessionStorage.setItem('bitcap_reloads', JSON.stringify({ n: tries, t: Date.now() }));
+		} catch (e) {}
+		if (tries > 3) { fail(C.nocookie); return; }
+		setTimeout(function () { location.replace(location.href); }, 550);
 	}
 	function solved(nonce, hash) {
 		if (finished) return;
@@ -51,21 +71,20 @@
 		$('pw-block').classList.add('found');
 		$('pw-status').textContent = C.found;
 		if (C.preview === '1') return;
-		var attrs = '; Path=/; SameSite=Lax' + (C.secure === '1' ? '; Secure' : '');
-		document.cookie = C.cookie + '=' + C.challenge + nonce + '.' + C.mac + '; Max-Age=' + C.ttl + attrs;
-		/* One-time marker: the server counts this block once and deletes the marker. */
-  document.cookie = (C.cookie || 'bitcap') + '_new=1; Max-Age=300' + attrs;
-		/* Cookies blocked: stop instead of mining again on every reload. */
-		if (document.cookie.indexOf(C.cookie + '=') === -1) { fail(C.nocookie); return; }
-		/* Loop guard: three solved blocks within 30 seconds mean the cookie does not stick. */
-		var tries = 1;
-		try {
-      var prev = JSON.parse(sessionStorage.getItem('bitcap_reloads') || '{}');
-      if (prev.t && Date.now() - prev.t < 30000) tries = (prev.n || 0) + 1;
-      sessionStorage.setItem('bitcap_reloads', JSON.stringify({ n: tries, t: Date.now() }));
-		} catch (e) {}
-		if (tries > 3) { fail(C.nocookie); return; }
-		setTimeout(function () { location.replace(location.href); }, 550);
+		var cookieValue = C.challenge + nonce + '.' + C.mac;
+		var verifyUrl = C.verify || '/.bitcap/verify';
+		fetch(verifyUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ cookie: cookieValue })
+		}).then(function (res) {
+			if (!res.ok) { fail(C.nocookie); return; }
+			return res.json();
+		}).then(function (body) {
+			if (!body || !body.ok) { fail(C.nocookie); return; }
+			afterVerify();
+		}).catch(function () { fail(C.nocookie); });
 	}
 	function onMessage(i) {
 		return function (ev) {

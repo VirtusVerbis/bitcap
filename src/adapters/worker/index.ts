@@ -4,17 +4,26 @@ import { classifyPath, requestPath } from "../../core/routing.ts";
 import {
   clientKey,
   getCookieValue,
+  isBindableIp,
   newChallenge,
   parseCookies,
   validCookie,
 } from "../../core/crypto.ts";
+import { clearNewMarkerHeaders } from "../../core/cookies.ts";
+import { resolveHostAction } from "../../core/hosts.ts";
 import { renderChallengeHtml } from "./challenge.ts";
+import { maybeIncrementBlock, readBlockCount } from "./kv-blocks.ts";
+import { consumeChallengeIssue } from "./kv-rate-limit.ts";
 import {
-  clearNewMarkerHeaders,
-  maybeIncrementBlock,
-  readBlockCount,
-} from "./kv-blocks.ts";
-import { COOKIE_NEW, VERSION } from "../../core/types.ts";
+  bindingDeniedResponse,
+  challengeHeaders,
+  disabledHostResponse,
+  rateLimitResponse,
+  unavailableResponse,
+  unknownHostResponse,
+} from "./responses.ts";
+import { handleVerifyPost } from "./verify.ts";
+import { COOKIE_NEW } from "../../core/types.ts";
 
 export interface Env {
   BITCAP_KV: KVNamespace;
@@ -23,20 +32,34 @@ export interface Env {
 }
 
 const hostMap = hosts as HostsConfig;
+const VERIFY_PATH = "/.bitcap/verify";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const hostname = url.hostname;
+    const secure = url.protocol === "https:";
 
     if (url.pathname.startsWith("/.bitcap/")) {
+      if (url.pathname === VERIFY_PATH && request.method.toUpperCase() === "POST") {
+        return handleBitcapVerify(request, env, hostname, secure);
+      }
       return serveAsset(request, env, url);
     }
 
     const host = hostMap[hostname];
-    if (!host || !host.enabled) {
+    const hostAction = resolveHostAction(host);
+    if (hostAction === "deny_unknown") {
+      return unknownHostResponse();
+    }
+    if (hostAction === "deny_disabled") {
+      return disabledHostResponse();
+    }
+    if (hostAction === "pass") {
       return fetch(request);
     }
+
+    const activeHost = host as HostConfig;
 
     const method = request.method.toUpperCase();
     if (method !== "GET" && method !== "HEAD") {
@@ -44,22 +67,27 @@ export default {
     }
 
     const path = requestPath(url);
-    const decision = classifyPath(host, path);
+    const decision = classifyPath(activeHost, path);
     if (decision === "pass") {
       return fetch(request);
     }
 
-    const ip = request.headers.get("CF-Connecting-IP") ?? "0.0.0.0";
-    const cookies = parseCookies(request.headers.get("Cookie"));
-    const rawCookie = getCookieValue(cookies);
-    const secret = env.BITCAP_SECRET;
+    const ip = request.headers.get("CF-Connecting-IP");
+    if (!isBindableIp(ip, activeHost.pow.binding)) {
+      return bindingDeniedResponse();
+    }
+    const clientIp = ip ?? "";
 
+    const secret = env.BITCAP_SECRET;
     if (!secret) {
-      return new Response("BITCAP_SECRET not configured", { status: 500 });
+      return unavailableResponse();
     }
 
+    const cookies = parseCookies(request.headers.get("Cookie"));
+    const rawCookie = getCookieValue(cookies);
+
     if (rawCookie) {
-      const block = await validCookie(rawCookie, secret, host.pow, ip);
+      const block = await validCookie(rawCookie, secret, activeHost.pow, clientIp);
       if (block) {
         await maybeIncrementBlock(
           env.BITCAP_KV,
@@ -67,31 +95,40 @@ export default {
           block.salt,
           Boolean(cookies[COOKIE_NEW]),
           block.expiry,
-          host.pow.ttlHours,
+          activeHost.pow.ttlHours,
         );
         const origin = await fetch(request);
         if (!cookies[COOKIE_NEW]) {
           return origin;
         }
         const res = new Response(origin.body, origin);
-        for (const h of clearNewMarkerHeaders()) {
+        for (const h of clearNewMarkerHeaders(secure)) {
           res.headers.append("Set-Cookie", h);
         }
         return res;
       }
     }
 
+    const limited = await consumeChallengeIssue(
+      env.BITCAP_KV,
+      hostname,
+      clientIp,
+      activeHost.rateLimit,
+    );
+    if (!limited.allowed) {
+      return rateLimitResponse(limited.retryAfterSec);
+    }
+
     if (method === "HEAD") {
       return new Response(null, {
-        status: host.pow.httpStatus,
-        headers: challengeHeaders(),
+        status: activeHost.pow.httpStatus,
+        headers: challengeHeaders(secure),
       });
     }
 
-    const client = await clientKey(secret, host.pow.binding, ip);
-    const c = await newChallenge(secret, host.pow, client);
+    const client = await clientKey(secret, activeHost.pow.binding, clientIp);
+    const c = await newChallenge(secret, activeHost.pow, client);
     const blockHeight = (await readBlockCount(env.BITCAP_KV, hostname)) + 1;
-    const secure = url.protocol === "https:";
     const back =
       request.headers.get("Referer") &&
       new URL(request.headers.get("Referer")!).hostname === hostname
@@ -104,17 +141,57 @@ export default {
       bits: c.bits,
       blockHeight,
       secure,
-      pow: host.pow,
-      branding: host.branding,
+      pow: activeHost.pow,
+      branding: activeHost.branding,
       backUrl: back,
     });
 
     return new Response(html, {
-      status: host.pow.httpStatus,
-      headers: challengeHeaders(),
+      status: activeHost.pow.httpStatus,
+      headers: challengeHeaders(secure),
     });
   },
 };
+
+async function handleBitcapVerify(
+  request: Request,
+  env: Env,
+  hostname: string,
+  secure: boolean,
+): Promise<Response> {
+  const host = hostMap[hostname];
+  const hostAction = resolveHostAction(host);
+  if (hostAction === "deny_unknown") {
+    return unknownHostResponse();
+  }
+  if (hostAction === "deny_disabled") {
+    return disabledHostResponse();
+  }
+  if (hostAction === "pass") {
+    return unavailableResponse();
+  }
+
+  const activeHost = host as HostConfig;
+  const ip = request.headers.get("CF-Connecting-IP");
+  if (!isBindableIp(ip, activeHost.pow.binding)) {
+    return bindingDeniedResponse();
+  }
+
+  const secret = env.BITCAP_SECRET;
+  if (!secret) {
+    return unavailableResponse();
+  }
+
+  return handleVerifyPost(
+    request,
+    hostname,
+    activeHost,
+    secret,
+    ip ?? "",
+    secure,
+    env.BITCAP_KV,
+  );
+}
 
 async function serveAsset(
   request: Request,
@@ -134,12 +211,4 @@ async function serveAsset(
   }
   headers.set("Cache-Control", "public, max-age=86400");
   return new Response(res.body, { status: res.status, headers });
-}
-
-function challengeHeaders(): HeadersInit {
-  return {
-    "Content-Type": "text/html; charset=utf-8",
-    "Cache-Control": "no-store, max-age=0",
-    "X-Robots-Tag": "noindex, nofollow",
-  };
 }

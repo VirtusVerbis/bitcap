@@ -32,10 +32,3 @@ export async function maybeIncrementBlock(
   const current = await readBlockCount(kv, hostname);
   await kv.put(countKey, String(current + 1));
 }
-
-export function clearNewMarkerHeaders(): string[] {
-  return [
-    "bitcap_new=; Path=/; Max-Age=0; SameSite=Lax",
-    "bitcap_new=; Path=/; Max-Age=0; SameSite=Lax; Secure",
-  ];
-}

@@ -6,6 +6,11 @@ export interface PathRules {
   prefixes: string[];
 }
 
+export interface RateLimitConfig {
+  maxPerMinute?: number;
+  windowSec?: number;
+}
+
 export interface PowConfig {
   baseBits: number;
   ttlHours: number;
@@ -20,8 +25,11 @@ export interface BrandingConfig {
   text: string;
 }
 
+export type WhenDisabled = "pass" | "deny";
+
 export interface HostConfig {
   enabled: boolean;
+  whenDisabled?: WhenDisabled;
   mode: GateMode;
   neverChallenge: PathRules;
   probePatterns: string[];
@@ -29,6 +37,7 @@ export interface HostConfig {
   allowExtensions: string[];
   pow: PowConfig;
   branding: BrandingConfig;
+  rateLimit?: RateLimitConfig;
 }
 
 export type HostsConfig = Record<string, HostConfig>;

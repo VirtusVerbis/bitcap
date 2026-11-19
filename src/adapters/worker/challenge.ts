@@ -44,6 +44,7 @@ export function renderChallengeHtml(p: ChallengePageParams): string {
     `data-found="${esc(t.found)}"`,
     `data-nocookie="${esc(t.nocook)}"`,
     `data-preview="0"`,
+    `data-verify="/.bitcap/verify"`,
   ].join(" ");
 
   return `<!doctype html>

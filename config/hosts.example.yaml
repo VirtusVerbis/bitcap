@@ -5,6 +5,7 @@
 
 example.com:
   enabled: true
+  # whenDisabled: pass   # optional; default deny (503) when enabled: false
   mode: probe
 
   neverChallenge:
@@ -33,6 +34,10 @@ example.com:
     ttlHours: 24
     binding: network
     httpStatus: 403
+
+  rateLimit:
+    maxPerMinute: 5
+    windowSec: 60
 
   branding:
     brandColor: "#f7931a"

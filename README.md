@@ -8,12 +8,23 @@ Bitcap runs on **Cloudflare Workers** first, but crypto and routing live in `src
 
 ## Features
 
-- HMAC-signed challenges + double SHA-256 PoW (same cookie shape as PoWned)
+- HMAC-signed challenges + double SHA-256 PoW (longer client key / challenge MAC than early PoWned-derived builds)
 - PoWned-style mining splash (`assets/`, port of challenge page)
 - Per-host config: **`probe`** or **`allowlist`** mode
-- KV **Block #N** counter
+- KV **Block #N** counter + per-IP challenge rate limit
+- HttpOnly `bitcap` cookie via `POST /.bitcap/verify` after mining
 - Cookie name: `bitcap`
 - Challenge scripts at `/.bitcap/bitcap_wor.js` and `bitcap_min.js` (neutral names to reduce adblock false positives)
+
+## Threat model
+
+- **Friction, not authentication.** Anyone who solves the PoW (or holds a valid cookie) can read gated **GET/HEAD** paths.
+- **POST, PUT, PATCH, DELETE** are **not** gated and always reach the origin.
+- Hostnames must appear in `config/hosts.yaml`; unknown hosts get **404** from the Worker.
+- `enabled: false` returns **503** unless `whenDisabled: pass` (origin only, no PoW).
+- Client binding uses **`CF-Connecting-IP`**; `ip` / `network` binding requires a valid connecting IP.
+- Secret compromise allows forging cookies until you rotate `BITCAP_SECRET` and redeploy.
+- Optional: add Cloudflare **Rate Limiting** rules on the zone for coarse abuse control.
 
 ## Quick start (bitcoinpunchup.com)
 
@@ -31,13 +42,21 @@ Bitcap runs on **Cloudflare Workers** first, but crypto and routing live in `src
 | `probe` | Challenge only when `probePatterns` match. Safe default; add patterns from CF analytics. |
 | `allowlist` | Challenge when path is **not** in `allow` (+ optional `allowExtensions`). |
 
-Switch: edit `config/hosts.yaml` → `npm run deploy`. Existing cookies work until TTL.
+Switch: edit `config/hosts.yaml` → `npm run deploy`. Changing `baseBits` or rotating the secret invalidates existing cookies.
+
+After security-hardening deploys, cookie MAC length and issuance path change; users re-mine once.
 
 ## Config
 
 See [config/hosts.yaml](config/hosts.yaml) and [config/hosts.example.yaml](config/hosts.example.yaml).
 
 Deploy-time only (no admin UI in v1).
+
+| Field | Purpose |
+|-------|---------|
+| `whenDisabled: pass` | Skip PoW when `enabled: false` instead of 503 |
+| `rateLimit.maxPerMinute` | Cap new challenges + verify POSTs per IP (default 5/min) |
+| `rateLimit.windowSec` | KV window for rate limit (default 60) |
 
 ## Free tier
 
