@@ -33,7 +33,7 @@
     },
     "allowExtensions": [],
     "pow": {
-      "baseBits": 18,
+      "baseBits": 22,
       "ttlHours": 0.25,
       "binding": "network",
       "httpStatus": 403
