@@ -13,6 +13,10 @@ id = "e6f90b76b6e14e3cb2963419afddd41f"
 pattern = "bitcoinpunchup.com/*"
 zone_name = "bitcoinpunchup.com"
 
+[[routes]]
+pattern = "bitcoinbloodhound.com/*"
+zone_name = "bitcoinbloodhound.com"
+
 [assets]
 directory = "assets"
 binding = "ASSETS"

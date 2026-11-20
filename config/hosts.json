@@ -44,5 +44,51 @@
       "title": "",
       "text": ""
     }
+  },
+  "bitcoinbloodhound.com": {
+    "enabled": true,
+    "mode": "allowlist",
+    "neverChallenge": {
+      "exact": [
+        "/robots.txt"
+      ],
+      "prefixes": []
+    },
+    "probePatterns": [
+      "/wp-admin*",
+      "/wp-login.php",
+      "/wp-*",
+      "/xmlrpc.php",
+      "/*.php",
+      "/.env",
+      "/.git/*"
+    ],
+    "allow": {
+      "exact": [
+        "/",
+        "/manifest.webmanifest",
+        "/bloodhound_logo_1024x1024.png",
+        "/lnurl_address.jpeg",
+        "/about",
+        "/queue"
+      ],
+      "prefixes": [
+        "/assets/",
+        "/api/"
+      ]
+    },
+    "allowExtensions": [],
+    "pow": {
+      "baseBits": 22,
+      "ttlHours": 0.25,
+      "binding": "network",
+      "httpStatus": 403
+    },
+    "branding": {
+      "brandColor": "#f7931a",
+      "logoUrl": "/bloodhound_logo_1024x1024.png",
+      "title": "",
+      "text": ""
+    }
   }
 }
