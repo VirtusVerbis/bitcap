@@ -6,6 +6,7 @@ import {
   newChallenge,
   zeroBits,
 } from "../../src/core/crypto.ts";
+import { renderChallengeHtml } from "../../src/adapters/worker/challenge.ts";
 import {
   handleVerifyPost,
   sameSiteHostname,
@@ -51,6 +52,30 @@ async function solvedCookie(): Promise<{ cookie: string; ip: string }> {
   throw new Error("no nonce");
 }
 
+const challengeBase = {
+  challenge: "ch",
+  mac: "mac",
+  bits: 18,
+  blockHeight: 42,
+  secure: true,
+  pow: { baseBits: 18, ttlHours: 1, binding: "network" as const, httpStatus: 403 },
+  branding: { brandColor: "#f7931a", logoUrl: "", title: "", text: "" },
+  backUrl: "https://example.com/",
+};
+
+describe("renderChallengeHtml", () => {
+  it("shows Block #N when blockPlaceholder is set", () => {
+    const html = renderChallengeHtml({ ...challengeBase, blockPlaceholder: true });
+    expect(html).toContain("Block #N");
+    expect(html).not.toContain("Block #42");
+  });
+
+  it("shows numeric block height when not placeholder", () => {
+    const html = renderChallengeHtml({ ...challengeBase, blockPlaceholder: false });
+    expect(html).toContain("Block #42");
+  });
+});
+
 describe("verify", () => {
   it("sameSiteHostname accepts matching Origin", () => {
     const req = new Request("https://example.com/.bitcap/verify", {
@@ -64,6 +89,44 @@ describe("verify", () => {
       headers: { Origin: "https://evil.example" },
     });
     expect(sameSiteHostname(req, "example.com")).toBe(false);
+  });
+
+  it("free tier never rate-limits verify POST", async () => {
+    const { cookie, ip } = await solvedCookie();
+    const kv = mockKv();
+    const cfg = { ...host, rateLimit: { maxPerMinute: 1, windowSec: 60 } };
+    const body = JSON.stringify({ cookie });
+    const makeReq = () =>
+      new Request("https://example.com/.bitcap/verify", {
+        method: "POST",
+        headers: {
+          Origin: "https://example.com",
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+    const res1 = await handleVerifyPost(
+      makeReq(),
+      "example.com",
+      cfg,
+      secret,
+      ip,
+      true,
+      false,
+    );
+    expect(res1.status).toBe(200);
+    const res2 = await handleVerifyPost(
+      makeReq(),
+      "example.com",
+      cfg,
+      secret,
+      ip,
+      true,
+      false,
+    );
+    expect(res2.status).toBe(200);
+    const stored = await kv.get(`rl:ch:example.com:${ip}`);
+    expect(stored).toBeNull();
   });
 
   it("sets cookies on valid verify POST", async () => {
@@ -82,6 +145,7 @@ describe("verify", () => {
       host,
       secret,
       ip,
+      true,
       true,
       mockKv(),
     );

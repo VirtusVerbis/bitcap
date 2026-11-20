@@ -24,11 +24,32 @@ import {
 } from "./responses.ts";
 import { handleVerifyPost } from "./verify.ts";
 import { COOKIE_NEW } from "../../core/types.ts";
+import { isPaidTier } from "./tier.ts";
+import type { RateLimitConfig } from "../../core/types.ts";
+import type { ChallengeRateLimitResult } from "./kv-rate-limit.ts";
 
 export interface Env {
-  BITCAP_KV: KVNamespace;
+  CF_TIER?: string;
+  BITCAP_KV?: KVNamespace;
   BITCAP_SECRET: string;
   ASSETS: Fetcher;
+}
+
+async function checkChallengeRateLimit(
+  env: Env,
+  hostname: string,
+  clientIp: string,
+  rateLimit?: RateLimitConfig,
+): Promise<ChallengeRateLimitResult> {
+  if (!isPaidTier(env) || !env.BITCAP_KV) {
+    return { allowed: true };
+  }
+  return consumeChallengeIssue(
+    env.BITCAP_KV,
+    hostname,
+    clientIp,
+    rateLimit,
+  );
 }
 
 const hostMap = hosts as HostsConfig;
@@ -89,14 +110,16 @@ export default {
     if (rawCookie) {
       const block = await validCookie(rawCookie, secret, activeHost.pow, clientIp);
       if (block) {
-        await maybeIncrementBlock(
-          env.BITCAP_KV,
-          hostname,
-          block.salt,
-          Boolean(cookies[COOKIE_NEW]),
-          block.expiry,
-          activeHost.pow.ttlHours,
-        );
+        if (isPaidTier(env) && env.BITCAP_KV) {
+          await maybeIncrementBlock(
+            env.BITCAP_KV,
+            hostname,
+            block.salt,
+            Boolean(cookies[COOKIE_NEW]),
+            block.expiry,
+            activeHost.pow.ttlHours,
+          );
+        }
         const origin = await fetch(request);
         if (!cookies[COOKIE_NEW]) {
           return origin;
@@ -109,8 +132,8 @@ export default {
       }
     }
 
-    const limited = await consumeChallengeIssue(
-      env.BITCAP_KV,
+    const limited = await checkChallengeRateLimit(
+      env,
       hostname,
       clientIp,
       activeHost.rateLimit,
@@ -128,7 +151,10 @@ export default {
 
     const client = await clientKey(secret, activeHost.pow.binding, clientIp);
     const c = await newChallenge(secret, activeHost.pow, client);
-    const blockHeight = (await readBlockCount(env.BITCAP_KV, hostname)) + 1;
+    const paid = isPaidTier(env) && env.BITCAP_KV;
+    const blockHeight = paid
+      ? (await readBlockCount(env.BITCAP_KV!, hostname)) + 1
+      : 0;
     const back =
       request.headers.get("Referer") &&
       new URL(request.headers.get("Referer")!).hostname === hostname
@@ -140,6 +166,7 @@ export default {
       mac: c.mac,
       bits: c.bits,
       blockHeight,
+      blockPlaceholder: !paid,
       secure,
       pow: activeHost.pow,
       branding: activeHost.branding,
@@ -189,6 +216,7 @@ async function handleBitcapVerify(
     secret,
     ip ?? "",
     secure,
+    isPaidTier(env),
     env.BITCAP_KV,
   );
 }

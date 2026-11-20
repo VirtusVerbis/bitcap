@@ -36,7 +36,8 @@ export async function handleVerifyPost(
   secret: string,
   ip: string,
   secure: boolean,
-  kv: KVNamespace,
+  paid: boolean,
+  kv?: KVNamespace,
 ): Promise<Response> {
   if (!sameSiteHostname(request, hostname)) {
     return new Response("Forbidden", { status: 403 });
@@ -63,9 +64,11 @@ export async function handleVerifyPost(
     return new Response("Bad Request", { status: 400 });
   }
 
-  const limited = await consumeChallengeIssue(kv, hostname, ip, host.rateLimit);
-  if (!limited.allowed) {
-    return rateLimitResponse(limited.retryAfterSec);
+  if (paid && kv) {
+    const limited = await consumeChallengeIssue(kv, hostname, ip, host.rateLimit);
+    if (!limited.allowed) {
+      return rateLimitResponse(limited.retryAfterSec);
+    }
   }
 
   const block = await validCookie(cookie, secret, host.pow, ip);

@@ -67,6 +67,7 @@ bitcoinbloodhound.com:
       - /bloodhound_logo_1024x1024.png
       - /lnurl_address.jpeg
       - /about
+      - /about/
       - /queue
     prefixes:
       - /assets/

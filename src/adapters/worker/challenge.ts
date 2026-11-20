@@ -1,12 +1,14 @@
 import type { BrandingConfig, PowConfig } from "../../core/types.ts";
 import { stringsForHost } from "../../core/strings.ts";
 import { VERSION } from "../../core/types.ts";
+import { FREE_BLOCK_LABEL } from "./tier.ts";
 
 export interface ChallengePageParams {
   challenge: string;
   mac: string;
   bits: number;
   blockHeight: number;
+  blockPlaceholder?: boolean;
   secure: boolean;
   pow: PowConfig;
   branding: BrandingConfig;
@@ -27,7 +29,9 @@ export function renderChallengeHtml(p: ChallengePageParams): string {
   const brand = /^#[0-9a-f]{3,8}$/i.test(p.branding.brandColor)
     ? p.branding.brandColor
     : "#f7931a";
-  const blockLine = t.block.replace("%s", String(p.blockHeight));
+  const blockLine = p.blockPlaceholder
+    ? FREE_BLOCK_LABEL
+    : t.block.replace("%s", String(p.blockHeight));
   const logo = p.branding.logoUrl.trim()
     ? `<img src="${esc(p.branding.logoUrl)}" alt="" width="16" height="16">`
     : "";

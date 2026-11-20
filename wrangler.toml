@@ -2,13 +2,16 @@ name = "bitcap"
 main = "src/adapters/worker/index.ts"
 compatibility_date = "2024-11-01"
 
-# Create KV: wrangler kv namespace create BITCAP_KV
-# Set id below; optional preview_id for wrangler dev
-[[kv_namespaces]]
-binding = "BITCAP_KV"
-id = "e6f90b76b6e14e3cb2963419afddd41f"
+# CF_TIER: "free" (default) = no KV; "paid" = rate limit + block counter (requires BITCAP_KV below)
+[vars]
+CF_TIER = "free"
 
-# Route: attach in dashboard or uncomment when zone_id is known
+# Paid tier only — create: wrangler kv namespace create BITCAP_KV
+# Set CF_TIER = "paid" and uncomment:
+# [[kv_namespaces]]
+# binding = "BITCAP_KV"
+# id = "<YOUR_NAMESPACE_ID>"
+
 [[routes]]
 pattern = "bitcoinpunchup.com/*"
 zone_name = "bitcoinpunchup.com"
