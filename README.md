@@ -2,7 +2,7 @@
 
 Edge proof-of-work gate for HTTP sites — **GPL-2.0-or-later**.
 
-Challenge UI and browser miner are **derived from [PoWned](https://github.com/gobrrrme/PoWned)** (GoBrrr / Druck Hoch Drei e.U.). Thank you for publishing PoWned as open source.
+Challenge UI and browser miner are **derived from [PoWned](https://github.com/gobrrrme/PoWned)** by [GoBrrr](https://www.gobrrr.me). Thank you for publishing PoWned as open source.
 
 Bitcap runs on **Cloudflare Workers** first, but crypto and routing live in `src/core/` for other adapters later.
 

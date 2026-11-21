@@ -10,7 +10,7 @@ the Free Software Foundation, either version 2 of the License, or
 ## Derived from PoWned
 
 The following files are derived from [PoWned](https://github.com/gobrrrme/PoWned)
-by Druck Hoch Drei e.U. (GoBrrr), licensed under GPL-2.0-or-later:
+by GoBrrr (https://www.gobrrr.me), licensed under GPL-2.0-or-later:
 
 - `assets/challenge.css`
 - `assets/bitcap_wor.js` (derived from PoWned `worker.js`)
